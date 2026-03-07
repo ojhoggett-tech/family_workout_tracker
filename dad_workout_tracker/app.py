@@ -44,10 +44,10 @@ defaults = {
     "logged_in_user": None,
     "current_page": "login",
     "confirm_delete_index": None,
-    "calendar_week_offset": 0,
-    "family_week_offset": 0,
-    "expanded_date": None,
-    # For building a new session
+    # Day offsets — each arrow moves one day
+    "personal_day_offset": 0,
+    "family_day_offset": 0,
+    "expanded_personal": False,
     "draft_workouts": [],
     "session_saved": False,
 }
@@ -60,25 +60,35 @@ for key, value in defaults.items():
 # ACCOUNTS
 # ─────────────────────────────────────────
 
-accounts = ["🟡Dad", "🟠Mum", "⚪️Ozzie"]
+accounts = ["Dad", "Mum", "Ozzie"]
+
 account_colours = {
-    "🟡Dad":  "#FFD700",   # gold
-    "🟠Mum":  "#FF8C00",   # orange
-    "⚪️Ozzie": "#FFFFFF",  # white
+    "Dad":   "#FFD700",  # gold
+    "Mum":   "#FF8C00",  # orange
+    "Ozzie": "#FFFFFF",  # white
 }
+
 # ─────────────────────────────────────────
 # WORKOUT LISTS
 # ─────────────────────────────────────────
 
 workout_types = [
+    # Strength
     "Barbell back squat", "Front squat", "Deadlift", "Romanian deadlift",
     "Bench press", "Incline dumbbell press", "Overhead shoulder press",
     "Push-ups", "Pull-ups", "Chin-ups", "Bent-over barbell row",
     "Lat pulldown", "Dips", "Bicep curls", "Tricep pushdowns",
-    "Leg press", "Walking lunges", "Step-ups", "Calf raises", "Plank",
-    "Hanging leg raises", "Russian twists", "Skipping", "Sprinting",
-    "Box jumps", "Burpees", "Battle rope", "Sled pushes",
-    "Farmer carries", "Mountain climbers", "Peloton bike workout",
+    "Leg press", "Walking lunges", "Step-ups", "Calf raises",
+    "Farmer carries", "Sled pushes",
+    # Cardio / Conditioning
+    "Plank", "Hanging leg raises", "Russian twists", "Skipping",
+    "Sprinting", "Box jumps", "Burpees", "Battle rope",
+    "Mountain climbers", "Peloton bike workout",
+    "Running", "Outdoor cycling", "Walking dog", "Rowing", "Trampolining",
+    # Combat / Martial arts
+    "Bag work", "Shadow boxing", "Muay Thai", "BJJ",
+    # Classes / Sessions
+    "Flexibility drills", "PT", "Pilates",
 ]
 
 weighted_workouts = [
@@ -89,7 +99,8 @@ weighted_workouts = [
 ]
 
 weighted_or_non_weighted_workouts = [
-    "Dips", "Walking lunges", "Step-ups", "Pull-ups", "Chin-ups", "Sprinting",
+    "Dips", "Walking lunges", "Step-ups", "Pull-ups", "Chin-ups",
+    "Sprinting", "Shadow boxing",
 ]
 
 workouts_for_reps = [
@@ -101,13 +112,15 @@ workouts_for_reps = [
 ]
 
 workouts_timed = [
-    "Plank", "Skipping", "Battle rope", "Sled pushes",
-    "Farmer carries", "Peloton bike workout",
+    "Plank", "Skipping", "Battle rope", "Sled pushes", "Farmer carries",
+    "Peloton bike workout", "Shadow boxing",
+    "Running", "Outdoor cycling", "Walking dog", "Bag work", "Trampolining",
+    "Flexibility drills", "PT", "Pilates", "Muay Thai", "BJJ",
 ]
 
 workouts_timed_or_reps = [
     "Walking lunges", "Mountain climbers", "Russian twists",
-    "Box jumps", "Burpees", "Sprinting",
+    "Box jumps", "Burpees", "Sprinting", "Rowing",
 ]
 
 workouts_with_sets = [
@@ -115,7 +128,8 @@ workouts_with_sets = [
     "Bench press", "Incline dumbbell press", "Overhead shoulder press",
     "Push-ups", "Pull-ups", "Chin-ups", "Bent-over barbell row",
     "Lat pulldown", "Dips", "Bicep curls", "Tricep pushdowns",
-    "Leg press", "Step-ups", "Calf raises", "Hanging leg raises", "Walking lunges",
+    "Leg press", "Step-ups", "Calf raises", "Hanging leg raises",
+    "Walking lunges", "Rowing", "Bag work", "Trampolining", "Shadow boxing",
 ]
 
 
@@ -124,7 +138,6 @@ workouts_with_sets = [
 # ─────────────────────────────────────────
 
 def parse_time_str(t_str):
-    """Parse HH:MM string to a time object. Returns None if invalid."""
     try:
         return datetime.strptime(t_str, "%H:%M").time()
     except (ValueError, TypeError):
@@ -132,27 +145,20 @@ def parse_time_str(t_str):
 
 
 def calc_duration_minutes(start_str, end_str):
-    """
-    Given two HH:MM strings, return total duration in minutes.
-    If end is before start, assume it crossed midnight.
-    Returns None if either string is invalid.
-    """
     start = parse_time_str(start_str)
     end = parse_time_str(end_str)
     if start is None or end is None:
         return None
-    # Build datetimes on the same base date
     base = date(2000, 1, 1)
     dt_start = datetime.combine(base, start)
     dt_end = datetime.combine(base, end)
     if dt_end < dt_start:
-        dt_end += timedelta(days=1)  # crossed midnight
+        dt_end += timedelta(days=1)
     delta = dt_end - dt_start
     return int(delta.total_seconds() // 60)
 
 
 def format_duration(minutes):
-    """Turn total minutes into a friendly string like '1 hr 25 mins'."""
     if minutes is None or minutes < 0:
         return "unknown duration"
     hours = minutes // 60
@@ -165,8 +171,25 @@ def format_duration(minutes):
         return f"{mins} mins"
 
 
+def format_seconds(total_seconds):
+    if total_seconds is None or total_seconds < 0:
+        return "unknown"
+    total_seconds = int(total_seconds)
+    hours = total_seconds // 3600
+    remainder = total_seconds % 3600
+    mins = remainder // 60
+    secs = remainder % 60
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours} hr")
+    if mins > 0:
+        parts.append(f"{mins} min")
+    if secs > 0 or len(parts) == 0:
+        parts.append(f"{secs} sec")
+    return " ".join(parts)
+
+
 def workout_summary_line(w):
-    """Build a one-line summary string for a single workout dict."""
     line = w["workout"]
     if w.get("weight_kg") is not None:
         line += f" — {w['weight_kg']}kg"
@@ -174,134 +197,150 @@ def workout_summary_line(w):
         line += f" — {w['sets']} sets"
     if w.get("reps") is not None:
         line += f" of {w['reps']} reps"
-    elif w.get("time_minutes") is not None:
-        line += f" for {w['time_minutes']} mins"
+    elif w.get("duration_seconds") is not None:
+        line += f" for {format_seconds(w['duration_seconds'])}"
     return line
 
 
 def get_monday_of_week(target_date):
-    """Return the Monday of the week containing target_date."""
     return target_date - timedelta(days=target_date.weekday())
 
 
 def sessions_by_date(username):
-    """
-    Return a dict mapping date strings ('YYYY-MM-DD') to a list of sessions
-    for that user.
-    """
     all_sessions = load_sessions()
     user_sessions = all_sessions.get(username, [])
     by_date = {}
     for s in user_sessions:
-        d = s.get("date")  # stored as 'YYYY-MM-DD'
+        d = s.get("date")
         if d:
             if d not in by_date:
                 by_date[d] = []
             by_date[d].append(s)
     return by_date
 
+
 def family_sessions_by_date():
-    """
-    Returns a dict mapping 'YYYY-MM-DD' to a list of usernames
-    who trained that day. Duplicates are removed (one dot per person per day).
-    Example: {'2026-03-05': ['Dad', 'Ozzie'], '2026-03-06': ['Mum']}
-    """
     all_sessions = load_sessions()
     by_date = {}
-
     for username, sessions in all_sessions.items():
         for s in sessions:
             d = s.get("date")
             if d:
                 if d not in by_date:
                     by_date[d] = []
-                # Only add this person once per day
                 if username not in by_date[d]:
                     by_date[d].append(username)
-
     return by_date
 
 
 def render_family_dots(usernames_who_trained):
-    """
-    Given a list of usernames, build an HTML string showing
-    one coloured circle per person, side by side.
-    """
     if not usernames_who_trained:
-        # Nobody trained — grey dot
-        return "<span style='font-size:1.1rem; color:#444;'>⚫</span>"
-
+        return "<div style='text-align:center; font-size:1.5rem; color:#444;'>⚫</div>"
     dots_html = ""
     for username in usernames_who_trained:
         colour = account_colours.get(username, "#888888")
-        # A small filled circle using a div with border-radius
         dots_html += (
-            f"<span style='"
-            f"display:inline-block; width:12px; height:12px; "
+            f"<span style='display:inline-block; width:16px; height:16px; "
             f"border-radius:50%; background-color:{colour}; "
-            f"margin:1px;'>"
-            f"</span>"
+            f"border: 1px solid #555; margin:2px;'></span>"
         )
+    return f"<div style='text-align:center; padding: 4px 0;'>{dots_html}</div>"
 
-    return f"<div style='text-align:center;'>{dots_html}</div>"
+
+def sessions_this_week(username):
+    """Count how many sessions the user has logged in the current Mon-Sun week."""
+    today = date.today()
+    monday = get_monday_of_week(today)
+    sunday = monday + timedelta(days=6)
+    all_sessions = load_sessions()
+    user_sessions = all_sessions.get(username, [])
+    count = 0
+    for s in user_sessions:
+        raw = s.get("date")
+        if raw:
+            try:
+                d = datetime.strptime(raw, "%Y-%m-%d").date()
+                if monday <= d <= sunday:
+                    count += 1
+            except ValueError:
+                pass
+    return count
+
+
+def timed_input(key_prefix):
+    col_h, col_m, col_s = st.columns(3)
+    with col_h:
+        hours = st.number_input("Hours:", min_value=0, step=1, key=f"{key_prefix}_hours")
+    with col_m:
+        mins = st.number_input("Minutes:", min_value=0, step=1, key=f"{key_prefix}_mins")
+    with col_s:
+        secs = st.number_input("Seconds:", min_value=0, max_value=59, step=1, key=f"{key_prefix}_secs")
+    return int((hours * 3600) + (mins * 60) + secs)
+
+
+# ─────────────────────────────────────────
+# FAMILY CALENDAR — single day view
+# ─────────────────────────────────────────
 
 def show_family_calendar():
-    st.subheader("Family activity")
+    st.subheader(" Family activity ")
 
     today = date.today()
-    offset = st.session_state.family_week_offset
-    displayed_monday = get_monday_of_week(today) + timedelta(weeks=offset)
-
-    week_dates = [displayed_monday + timedelta(days=i) for i in range(7)]
-    months_in_week = list(dict.fromkeys(d.strftime("%B %Y") for d in week_dates))
-    month_label = " / ".join(months_in_week)
+    displayed_date = today + timedelta(days=st.session_state.family_day_offset)
+    date_str = displayed_date.strftime("%Y-%m-%d")
+    friendly_date = displayed_date.strftime("%A %d %B %Y")
+    is_today = displayed_date == today
 
     family_by_date = family_sessions_by_date()
+    trainers_today = family_by_date.get(date_str, [])
 
-    # Navigation
+    # Navigation row
     col_left, col_mid, col_right = st.columns([1, 4, 1])
     with col_left:
         if st.button("◀", key="fam_cal_prev"):
-            st.session_state.family_week_offset -= 1
+            st.session_state.family_day_offset -= 1
             st.rerun()
     with col_mid:
+        label = f"**Today** — {friendly_date}" if is_today else friendly_date
         st.markdown(
-            f"<p style='text-align:center; font-size:0.9rem; color:#888;'>{month_label}</p>",
+            f"<p style='text-align:center; font-size:0.9rem; color:#888;'>{label}</p>",
             unsafe_allow_html=True,
         )
     with col_right:
         if st.button("▶", key="fam_cal_next"):
-            st.session_state.family_week_offset += 1
+            st.session_state.family_day_offset += 1
             st.rerun()
 
-    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    day_cols = st.columns(7)
+    # Dots for this day
+    st.markdown(render_family_dots(trainers_today), unsafe_allow_html=True)
 
-    for i, col in enumerate(day_cols):
-        day_date = displayed_monday + timedelta(days=i)
-        date_str = day_date.strftime("%Y-%m-%d")
-        trainers_today = family_by_date.get(date_str, [])
-        is_today = day_date == today
-        label_style = "font-weight:bold;" if is_today else ""
+    # Show who trained if anyone did
+    if trainers_today:
+        names = ", ".join(trainers_today)
+        st.markdown(
+            f"<p style='text-align:center; font-size:0.85rem; color:#aaa;'>{names}</p>",
+            unsafe_allow_html=True,
+        )
 
-        with col:
-            st.markdown(
-                f"<p style='text-align:center; font-size:0.8rem; {label_style}'>"
-                f"{day_names[i]}<br>"
-                f"<span style='font-size:0.75rem; color:#999;'>{day_date.day}</span>"
-                f"</p>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(render_family_dots(trainers_today), unsafe_allow_html=True)
-
+    # Colour key
+    st.markdown("&nbsp;", unsafe_allow_html=True)
+    key_html = ""
+    for name, colour in account_colours.items():
+        key_html += (
+            f"<span style='display:inline-block; width:10px; height:10px; "
+            f"border-radius:50%; background-color:{colour}; "
+            f"border: 1px solid #555; margin-right:4px;'></span>"
+            f"<span style='font-size:0.8rem; margin-right:12px;'>{name}</span>"
+        )
+    st.markdown(f"<div style='text-align:center;'>{key_html}</div>", unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────
 # PAGE: LOGIN
-# ─────────────────────────────────────────
+# ───────────────────────────â─────────────
 
 def show_login_page():
-    st.title("Family Workout Tracker ")
+    st.title("Family Workout Tracker")
     st.write("---")
 
     show_family_calendar()
@@ -312,99 +351,66 @@ def show_login_page():
         if st.button(account, use_container_width=True):
             st.session_state.logged_in_user = account
             st.session_state.current_page = "home"
-            st.session_state.calendar_week_offset = 0
-            st.session_state.expanded_date = None
+            st.session_state.personal_day_offset = 0
+            st.session_state.expanded_personal = False
             st.rerun()
 
 
 # ─────────────────────────────────────────
-# PAGE: HOME (with calendar)
+# PAGE: HOME — single day personal calendar
 # ─────────────────────────────────────────
 
 def show_home_page():
     username = st.session_state.logged_in_user
 
-    st.markdown(f"<h1 style='text-align: center;'>Welcome {username} !</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center;'>{username}</h1>", unsafe_allow_html=True)
     st.write("---")
 
-    # ── Calendar ──
     today = date.today()
-    offset = st.session_state.calendar_week_offset
-    # The Monday of the currently displayed week
-    displayed_monday = get_monday_of_week(today) + timedelta(weeks=offset)
-
-    # Work out the month(s) in this week for the label
-    week_dates = [displayed_monday + timedelta(days=i) for i in range(7)]
-    months_in_week = list(dict.fromkeys(d.strftime("%B %Y") for d in week_dates))
-    month_label = " / ".join(months_in_week)
+    displayed_date = today + timedelta(days=st.session_state.personal_day_offset)
+    date_str = displayed_date.strftime("%Y-%m-%d")
+    friendly_date = displayed_date.strftime("%A %d %B %Y")
+    is_today = displayed_date == today
 
     by_date = sessions_by_date(username)
+    has_session = date_str in by_date
 
     # Navigation row
     col_left, col_mid, col_right = st.columns([1, 4, 1])
     with col_left:
         if st.button("◀", key="cal_prev"):
-            st.session_state.calendar_week_offset -= 1
-            st.session_state.expanded_date = None
+            st.session_state.personal_day_offset -= 1
+            st.session_state.expanded_personal = False
             st.rerun()
     with col_mid:
+        label = f"Today — {friendly_date}" if is_today else friendly_date
         st.markdown(
-            f"<p style='text-align:center; font-size:0.9rem; color:#888; margin:0;'>{month_label}</p>",
+            f"<p style='text-align:center; font-size:0.9rem; color:#888;'>{label}</p>",
             unsafe_allow_html=True,
         )
     with col_right:
         if st.button("▶", key="cal_next"):
-            st.session_state.calendar_week_offset += 1
-            st.session_state.expanded_date = None
+            st.session_state.personal_day_offset += 1
+            st.session_state.expanded_personal = False
             st.rerun()
 
-    # Day labels + dots
-    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-    day_cols = st.columns(7)
+    # Bar for this day
+    if has_session:
+        if st.button("🔵  View sessions", key="personal_dot", use_container_width=True):
+            st.session_state.expanded_personal = not st.session_state.expanded_personal
+            st.rerun()
+    else:
+        st.markdown(
+            "<div style='background-color:#2a2a2a; border-radius:8px; "
+            "padding:10px; text-align:center; color:#555; font-size:0.85rem;'>"
+            "No session logged</div>",
+            unsafe_allow_html=True,
+        )
 
-    for i, col in enumerate(day_cols):
-        day_date = displayed_monday + timedelta(days=i)
-        date_str = day_date.strftime("%Y-%m-%d")
-        has_session = date_str in by_date
-        is_today = day_date == today
-
-        dot_color = "#3a86ff" if has_session else "#cccccc"
-        day_num = day_date.day
-
-        # Highlight today's label
-        label_style = "font-weight:bold;" if is_today else ""
-
-        with col:
-            st.markdown(
-                f"<p style='text-align:center; font-size:0.8rem; {label_style}'>"
-                f"{day_names[i]}<br>"
-                f"<span style='font-size:0.75rem; color:#999;'>{day_num}</span>"
-                f"</p>",
-                unsafe_allow_html=True,
-            )
-
-            if has_session:
-                # Clickable button styled as a dot
-                if st.button("🔵", key=f"dot_{date_str}"):
-                    if st.session_state.expanded_date == date_str:
-                        st.session_state.expanded_date = None
-                    else:
-                        st.session_state.expanded_date = date_str
-                    st.rerun()
-            else:
-                st.markdown(
-                    "<p style='text-align:center; font-size:1.2rem; color:#cccccc;'>⚫</p>",
-                    unsafe_allow_html=True,
-                )
-
-    # Expanded day detail
-    if st.session_state.expanded_date and st.session_state.expanded_date in by_date:
-        exp_date = st.session_state.expanded_date
-        exp_sessions = by_date[exp_date]
-        friendly_date = datetime.strptime(exp_date, "%Y-%m-%d").strftime("%A %d %B %Y")
-
+    # Expanded session detail
+    if has_session and st.session_state.expanded_personal:
+        exp_sessions = by_date[date_str]
         with st.container(border=True):
-            st.markdown(f"**{friendly_date}**")
             for idx, sess in enumerate(exp_sessions):
                 dur = calc_duration_minutes(sess.get("start_time"), sess.get("end_time"))
                 dur_str = format_duration(dur)
@@ -421,38 +427,33 @@ def show_home_page():
     all_sessions = load_sessions()
     user_sessions = all_sessions.get(username, [])
 
+    this_week_count = sessions_this_week(username)
+    st.markdown(f"This week: **{this_week_count} session(s)** so far.")
+
     if len(user_sessions) >= 2:
-        # Find date range
         all_dates = sorted(set(s["date"] for s in user_sessions if "date" in s))
         if len(all_dates) >= 2:
             first = datetime.strptime(all_dates[0], "%Y-%m-%d").date()
             last = datetime.strptime(all_dates[-1], "%Y-%m-%d").date()
             total_days = (last - first).days + 1
             total_weeks = max(1, round(total_days / 7))
-
-            # Sessions per week
             sessions_per_week = max(1, round(len(user_sessions) / total_weeks))
-
-            # Average duration
             durations = []
             for s in user_sessions:
                 dur = calc_duration_minutes(s.get("start_time"), s.get("end_time"))
                 if dur is not None and dur > 0:
                     durations.append(dur)
             avg_dur = format_duration(round(sum(durations) / len(durations))) if durations else "unknown"
-
             st.markdown(
-                f" On average you train **{sessions_per_week}x per week** "
+                f"On average you train **{sessions_per_week}x per week** "
                 f"for **{avg_dur}** per session."
             )
-            st.write("---")
 
-    # ── Buttons ──
-    all_s = load_sessions()
-    u_sessions = all_s.get(username, [])
-    if len(u_sessions) > 0:
-        st.write(f"You have **{len(u_sessions)}** session(s) logged.")
-        if st.button(" See all sessions"):
+    st.write("---")
+
+    if len(user_sessions) > 0:
+        st.write(f"You have **{len(user_sessions)}** session(s) logged.")
+        if st.button("See all sessions"):
             st.session_state.current_page = "history"
             st.rerun()
 
@@ -486,25 +487,17 @@ def show_log_session_page():
 
     now = datetime.now()
     now_time_str = now.strftime("%H:%M")
-    today_str = now.strftime("%Y-%m-%d")
 
-    # ── Date ──
-    session_date_input = st.date_input(
-        "Session date:",
-        value=now.date(),
-    )
+    session_date_input = st.date_input("Session date:", value=now.date())
     session_date_str = session_date_input.strftime("%Y-%m-%d")
 
-    # ── Start / End Time ──
     st.write("**Session times** — pre-filled with the current time, change if needed:")
-
     col1, col2 = st.columns(2)
     with col1:
         start_time_str = st.text_input("Start time (HH:MM):", value=now_time_str, key="start_time_input")
     with col2:
         end_time_str = st.text_input("End time (HH:MM):", value=now_time_str, key="end_time_input")
 
-    # Validate times
     start_valid = parse_time_str(start_time_str) is not None
     end_valid = parse_time_str(end_time_str) is not None
 
@@ -533,11 +526,12 @@ def show_log_session_page():
                     st.rerun()
         st.write("---")
 
-    # ── Add a workout ─â
+    # ── Add a workout ──
     st.subheader("Add a workout:")
 
     selected_workout = st.selectbox("Select workout type:", workout_types, key="workout_select")
 
+    # Weight
     weight = None
     if selected_workout in weighted_workouts:
         weight = st.number_input("Amount of weight (kg):", min_value=0.0, step=2.5, key="weight_input")
@@ -546,19 +540,24 @@ def show_log_session_page():
         if weight_choice == "With weight":
             weight = st.number_input("Amount of weight (kg):", min_value=0.0, step=2.5, key="weight_input_optional")
 
+    # Reps / Time
     reps = None
-    time_w = None
+    duration_seconds = None
+
     if selected_workout in workouts_for_reps:
         reps = st.number_input("Number of reps:", min_value=0, step=1, key="reps_input")
     elif selected_workout in workouts_timed:
-        time_w = st.number_input("Amount of time (minutes):", min_value=0.0, step=0.5, key="time_input")
+        st.write("How long did you do it for?")
+        duration_seconds = timed_input("timed")
     elif selected_workout in workouts_timed_or_reps:
-        measure_choice = st.radio("How are you tracking this?", ["Reps", "Time (minutes)"], key="measure_choice")
+        measure_choice = st.radio("How are you tracking this?", ["Reps", "Time"], key="measure_choice")
         if measure_choice == "Reps":
             reps = st.number_input("Number of reps:", min_value=0, step=1, key="reps_input_alt")
         else:
-            time_w = st.number_input("Amount of time (minutes):", min_value=0.0, step=0.5, key="time_input_alt")
+            st.write("How long did you do it for?")
+            duration_seconds = timed_input("timed_or_reps")
 
+    # Sets
     how_many_sets = None
     if selected_workout in workouts_with_sets:
         how_many_sets = st.number_input(
@@ -570,25 +569,23 @@ def show_log_session_page():
         new_workout = {
             "workout": selected_workout,
             "weight_kg": weight,
-            "reps": reps,
-            "time_minutes": time_w,
             "sets": how_many_sets,
+            "reps": reps,
+            "duration_seconds": duration_seconds,
         }
         st.session_state.draft_workouts.append(new_workout)
         st.rerun()
 
     st.write("---")
 
-    # ── Save Session ──
     can_save = (
         len(st.session_state.draft_workouts) > 0
         and start_valid
         and end_valid
     )
 
-    if not can_save:
-        if len(st.session_state.draft_workouts) == 0:
-            st.caption("Add at least one workout before saving.")
+    if not can_save and len(st.session_state.draft_workouts) == 0:
+        st.caption("Add at least one workout before saving.")
 
     if st.button("Save Session", disabled=not can_save):
         session_entry = {
@@ -605,6 +602,9 @@ def show_log_session_page():
     if st.session_state.session_saved:
         st.success("Session saved! Add another or head back home.")
         st.session_state.session_saved = False
+        if st.button("Back to home"):
+            st.session_state.current_page = "home"
+            st.rerun()
 
 
 # ─────────────────────────────────────────
@@ -647,7 +647,6 @@ def show_history_page():
                 f"{session.get('start_time', '?')} to {session.get('end_time', '?')} "
                 f"({dur_str})"
             )
-
             for w in workouts:
                 st.markdown(f"• {workout_summary_line(w)}")
 
