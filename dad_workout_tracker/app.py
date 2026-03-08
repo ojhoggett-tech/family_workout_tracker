@@ -5,15 +5,16 @@ from datetime import datetime, timedelta, date
 
 st.set_page_config(page_title="Family Workouts", page_icon="favicon.ico")
 
-
 st.markdown("""
     <style>
     #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
     header {visibility: hidden;}
+    footer {visibility: hidden !important;}
+    [data-testid="stToolbar"] {visibility: hidden !important;}
+    [data-testid="stBottomBlockContainer"] {visibility: hidden !important;}
+    .stDeployButton {visibility: hidden !important;}
     </style>
 """, unsafe_allow_html=True)
-
 
 # ─────────────────────────────────────────
 # FILE SETUP
