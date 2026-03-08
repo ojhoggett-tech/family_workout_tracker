@@ -6,8 +6,6 @@ from datetime import datetime, timedelta, date
 from PIL import Image
 img = Image.open("dad_workout_tracker/favicon.ico")
 st.set_page_config(page_title="Family Workouts", page_icon=img)
-streamlit
-Pillow
 
 st.markdown("""
     <style>
