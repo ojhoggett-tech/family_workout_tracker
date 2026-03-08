@@ -3,6 +3,18 @@ import json
 import os
 from datetime import datetime, timedelta, date
 
+st.set_page_config(page_title="Family Workouts", page_icon="favicon.ico")
+
+
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
+
 # ─────────────────────────────────────────
 # FILE SETUP
 # ─────────────────────────────────────────
